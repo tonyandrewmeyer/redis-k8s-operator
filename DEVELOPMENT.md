@@ -105,8 +105,9 @@ operator behaviour without full deployment.
     tox -e fmt           # update your code according to linting rules
     tox -e lint          # code style
     tox -e unit          # unit tests
+    tox -e scenario      # [scenario](https://github.com/canonical/ops-scenario) tests
     tox -e integration   # integration tests
-    tox                  # runs 'lint' and 'unit' environments
+    tox                  # runs 'lint', 'unit', and 'scenario' environments
 
 
 ## Canonical Contributor Agreement

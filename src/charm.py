@@ -449,6 +449,9 @@ class RedisK8sCharm(CharmBase):
         resources = ["cert-file", "key-file", "ca-cert-file"]
         return [self._retrieve_resource(res) for res in resources]
 
+    # NOTE: It doesn't make sense for the property (getter) to have an argument
+    # since it can never be provided. This is also really a staticmethod since
+    # `self` is not used at all.
     @property
     def unit_pod_hostname(self, name="") -> str:
         """Creates the pod hostname from its name."""
