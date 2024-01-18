@@ -2,28 +2,25 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-# Remove this.
-from unittest import mock
-from ops.testing import Harness
-from ops.charm import RelationDepartedEvent
-
-import pwd
-import grp
-import stat
-import socket
 import contextlib
+import grp
 import pathlib
+import pwd
+import socket
+import stat
 import tempfile
 
-from redis import Redis
-from redis.exceptions import RedisError
-
-import pytest
+# Remove this.
+from unittest import mock
 
 import ops
 import ops.pebble
-
+import pytest
 import scenario
+from ops.charm import RelationDepartedEvent
+from ops.testing import Harness
+from redis import Redis
+from redis.exceptions import RedisError
 
 from charm import RedisK8sCharm
 from literals import REDIS_PORT
@@ -44,7 +41,7 @@ def setUp(self):
 class MockRedis:
     def __init__(self, mock_info):
         self.mock_info = mock_info
-    
+
     def info(self, key: str):
         return self.mock_info[key]
 
@@ -60,10 +57,10 @@ def test_on_update_status_success_leader(monkeypatch):
     monkeypatch.setattr(RedisK8sCharm, "_redis_client", redis_client)
     ctx = scenario.Context(RedisK8sCharm)
     relation = scenario.PeerRelation(
-       endpoint="redis-peers",
+        endpoint="redis-peers",
     )
     state = scenario.State(relations=[relation], leader=True)
-    out = ctx.run(scenario.Event('update-status'), state=state)
+    out = ctx.run(scenario.Event("update-status"), state=state)
     assert out.unit_status == ops.ActiveStatus()
     assert out.app_status == ops.ActiveStatus()
     # SCENARIO-NOTE: this isn't mentioned in the docs, only the history.
@@ -82,10 +79,10 @@ def test_on_update_status_failure_leader(monkeypatch):
     # skipped. However, a Harness test at the same level would probably still
     # need to create it.
     relation = scenario.PeerRelation(
-       endpoint="redis-peers",
+        endpoint="redis-peers",
     )
     state = scenario.State(relations=[relation], leader=True)
-    out = ctx.run(scenario.Event('update-status'), state=state)
+    out = ctx.run(scenario.Event("update-status"), state=state)
     assert out.unit_status == ops.WaitingStatus("Waiting for Redis...")
     assert out.app_status == ops.WaitingStatus("Waiting for Redis...")
     # SCENARIO-NOTE: In the Harness tests, this is None. I haven't checked
@@ -104,10 +101,10 @@ def test_on_update_status_success_not_leader(monkeypatch):
     monkeypatch.setattr(RedisK8sCharm, "_redis_client", redis_client)
     ctx = scenario.Context(RedisK8sCharm)
     relation = scenario.PeerRelation(
-       endpoint="redis-peers",
+        endpoint="redis-peers",
     )
     state = scenario.State(relations=[relation], leader=False)
-    out = ctx.run(scenario.Event('update-status'), state=state)
+    out = ctx.run(scenario.Event("update-status"), state=state)
     assert out.unit_status == ops.ActiveStatus()
     # SCENARIO-NOTE: with Harness, the test has to set the leader status to
     # true to validate that the app status is unknown. However, given that the
@@ -125,10 +122,10 @@ def test_on_update_status_failure_not_leader(monkeypatch):
     monkeypatch.setattr(RedisK8sCharm, "_redis_client", redis_client)
     ctx = scenario.Context(RedisK8sCharm)
     relation = scenario.PeerRelation(
-       endpoint="redis-peers",
+        endpoint="redis-peers",
     )
     state = scenario.State(relations=[relation], leader=False)
-    out = ctx.run(scenario.Event('update-status'), state=state)
+    out = ctx.run(scenario.Event("update-status"), state=state)
     assert out.unit_status == ops.WaitingStatus("Waiting for Redis...")
     # SCENARIO-NOTE: with Harness, the test has to set the leader status to
     # true to validate that the app status is unknown. However, given that the
@@ -152,13 +149,18 @@ def test_config_changed_when_unit_is_leader_status_success(monkeypatch):
     # (see the note in charm.py).
     unit_pod_hostname = socket.getfqdn()
     relation = scenario.PeerRelation(
-       endpoint="redis-peers",
-       local_app_data={"redis-password": password, "leader-host": unit_pod_hostname}
+        endpoint="redis-peers",
+        local_app_data={"redis-password": password, "leader-host": unit_pod_hostname},
     )
     redis_container = scenario.Container("redis", can_connect=True)
     sentinel_container = scenario.Container("sentinel", can_connect=True)
-    state = scenario.State(relations=[relation], containers=[redis_container, sentinel_container], leader=True, config={"enable-tls": False})
-    out = ctx.run(scenario.Event('config-changed'), state=state)
+    state = scenario.State(
+        relations=[relation],
+        containers=[redis_container, sentinel_container],
+        leader=True,
+        config={"enable-tls": False},
+    )
+    out = ctx.run(scenario.Event("config-changed"), state=state)
     extra_flags = [
         f"--requirepass {password}",
         "--bind 0.0.0.0",
@@ -200,13 +202,15 @@ def test_config_changed_when_unit_is_leader_status_failure(monkeypatch):
     # (see the note in charm.py).
     unit_pod_hostname = socket.getfqdn()
     relation = scenario.PeerRelation(
-       endpoint="redis-peers",
-       local_app_data={"redis-password": password, "leader-host": unit_pod_hostname}
+        endpoint="redis-peers",
+        local_app_data={"redis-password": password, "leader-host": unit_pod_hostname},
     )
     redis_container = scenario.Container("redis", can_connect=True)
     sentinel_container = scenario.Container("sentinel", can_connect=True)
-    state = scenario.State(relations=[relation], containers=[redis_container, sentinel_container], leader=True)
-    out = ctx.run(scenario.Event('config-changed'), state=state)
+    state = scenario.State(
+        relations=[relation], containers=[redis_container, sentinel_container], leader=True
+    )
+    out = ctx.run(scenario.Event("config-changed"), state=state)
     extra_flags = [
         f"--requirepass {password}",
         "--bind 0.0.0.0",
@@ -239,12 +243,14 @@ def test_config_changed_when_unit_is_leader_status_failure(monkeypatch):
 def test_config_changed_pebble_error():
     ctx = scenario.Context(RedisK8sCharm)
     relation = scenario.PeerRelation(
-       endpoint="redis-peers",
+        endpoint="redis-peers",
     )
     redis_container = scenario.Container("redis", can_connect=False)
     sentinel_container = scenario.Container("sentinel", can_connect=False)
-    state = scenario.State(relations=[relation], containers=[redis_container, sentinel_container], leader=True)
-    out = ctx.run(scenario.Event('config-changed'), state=state)
+    state = scenario.State(
+        relations=[relation], containers=[redis_container, sentinel_container], leader=True
+    )
+    out = ctx.run(scenario.Event("config-changed"), state=state)
     # SCENARIO-NOTE: the Harness test checks that a restart hasn't been done,
     # but it seems like just making sure there is still no plan is sufficient.
     found_plan = out.containers[0].plan.to_dict()
@@ -272,8 +278,8 @@ def test_config_changed_when_unit_is_leader_and_service_is_running(monkeypatch):
     # (see the note in charm.py).
     unit_pod_hostname = socket.getfqdn()
     relation = scenario.PeerRelation(
-       endpoint="redis-peers",
-       local_app_data={"redis-password": password, "leader-host": unit_pod_hostname}
+        endpoint="redis-peers",
+        local_app_data={"redis-password": password, "leader-host": unit_pod_hostname},
     )
     # SCENARIO-NOTE: the readme doesn't seem to have anything on setting up
     # service state. Also, the check for a restart here is basically using the
@@ -281,10 +287,14 @@ def test_config_changed_when_unit_is_leader_and_service_is_running(monkeypatch):
     # client). It seems like both could have a better way of verifying that a
     # restart was done, for the situation where the status is active and then
     # there's a restart and it's active again.
-    redis_container = scenario.Container("redis", can_connect=True, service_status={"redis": ops.pebble.ServiceStatus.INACTIVE})
+    redis_container = scenario.Container(
+        "redis", can_connect=True, service_status={"redis": ops.pebble.ServiceStatus.INACTIVE}
+    )
     sentinel_container = scenario.Container("sentinel", can_connect=True)
-    state = scenario.State(relations=[relation], containers=[redis_container, sentinel_container], leader=True)
-    out = ctx.run(scenario.Event('config-changed'), state=state)
+    state = scenario.State(
+        relations=[relation], containers=[redis_container, sentinel_container], leader=True
+    )
+    out = ctx.run(scenario.Event("config-changed"), state=state)
     assert out.unit_status == ops.ActiveStatus()
     assert out.app_status == ops.ActiveStatus()
     assert out.workload_version == "6.0.11"
@@ -294,7 +304,7 @@ def test_config_changed_when_unit_is_leader_and_service_is_running(monkeypatch):
 def test_password_on_leader_elected():
     ctx = scenario.Context(RedisK8sCharm)
     relation = scenario.PeerRelation(
-       endpoint="redis-peers",
+        endpoint="redis-peers",
     )
     # SCENARIO-TEST: this feels a bit odd: I have to have the state be
     # leader==True, but the event is leader-elected. It feels like the event
@@ -303,12 +313,12 @@ def test_password_on_leader_elected():
     # by the time the event handler is called, the Juju state already has the
     # leader value changed.
     state = scenario.State(relations=[relation], leader=True)
-    out = ctx.run(scenario.Event('leader-elected'), state=state)
+    out = ctx.run(scenario.Event("leader-elected"), state=state)
     admin_password = out.relations[0].local_app_data["redis-password"]
     assert admin_password
 
     # Trigger a new leader election and check that the password is still the same.
-    out = ctx.run(scenario.Event('leader-elected'), state=out)
+    out = ctx.run(scenario.Event("leader-elected"), state=out)
     assert out.relations[0].local_app_data["redis-password"] == admin_password
 
 
@@ -321,12 +331,11 @@ def test_on_relation_changed_status_when_unit_is_leader():
     # Given
     ctx = scenario.Context(RedisK8sCharm)
     relation = scenario.PeerRelation(
-       endpoint="redis-peers",
-       local_app_data={"leader-host": unit_pod_hostname}
+        endpoint="redis-peers", local_app_data={"leader-host": unit_pod_hostname}
     )
     wordpress_relation = scenario.Relation(
-       endpoint="redis",
-       remote_app_name="wordpress",
+        endpoint="redis",
+        remote_app_name="wordpress",
     )
     state = scenario.State(relations=[relation, wordpress_relation], leader=True)
 
@@ -336,7 +345,7 @@ def test_on_relation_changed_status_when_unit_is_leader():
     # Then
     databag = out.relations[1].local_unit_data
     assert databag["hostname"] == leader_ip
-    assert databag["port"] == '6379'
+    assert databag["port"] == "6379"
 
 
 def test_pebble_layer_on_relation_created():
@@ -345,15 +354,16 @@ def test_pebble_layer_on_relation_created():
     # (see the note in charm.py).
     unit_pod_hostname = socket.getfqdn()
     relation = scenario.PeerRelation(
-       endpoint="redis-peers",
-       local_app_data={"leader-host": unit_pod_hostname}
+        endpoint="redis-peers", local_app_data={"leader-host": unit_pod_hostname}
     )
     wordpress_relation = scenario.Relation(
-       endpoint="redis",
-       remote_app_name="wordpress",
+        endpoint="redis",
+        remote_app_name="wordpress",
     )
     redis_container = scenario.Container("redis", can_connect=True)
-    state = scenario.State(relations=[relation, wordpress_relation], containers=[redis_container], leader=True)
+    state = scenario.State(
+        relations=[relation, wordpress_relation], containers=[redis_container], leader=True
+    )
     out = ctx.run(wordpress_relation.created_event(), state=state)
 
     # Check that the resulting plan does not have a password
@@ -377,6 +387,7 @@ def test_pebble_layer_on_relation_created():
     found_plan = out.containers[0].plan.to_dict()
     assert found_plan == expected_plan
 
+
 @pytest.fixture()
 def resources():
     with tempfile.TemporaryDirectory() as resource_folder:
@@ -390,30 +401,37 @@ def resources():
         ca_cert_file_name = resource_folder / "ca-cert-file"
         with open(ca_cert_file_name, "w") as ca_cert_file:
             ca_cert_file.write("ca-cert")
-        yield {"cert-file": cert_file_name, "key-file": key_file_name, "ca-cert-file": ca_cert_file_name}
+        yield {
+            "cert-file": cert_file_name,
+            "key-file": key_file_name,
+            "ca-cert-file": ca_cert_file_name,
+        }
+
 
 def test_attach_resource(resources):
     ctx = scenario.Context(RedisK8sCharm)
     relation = scenario.PeerRelation(
-       endpoint="redis-peers",
+        endpoint="redis-peers",
     )
     redis_container = scenario.Container("redis", can_connect=True)
-    state = scenario.State(leader=True, relations=[relation], containers=[redis_container], resources=resources)
-    out = ctx.run(scenario.Event('upgrade-charm'), state=state)
+    state = scenario.State(
+        leader=True, relations=[relation], containers=[redis_container], resources=resources
+    )
+    out = ctx.run(scenario.Event("upgrade-charm"), state=state)
     container_root_fs = out.containers[0].get_filesystem(ctx)
-    cert_file = container_root_fs / 'var/lib/redis' / 'cert-file'
+    cert_file = container_root_fs / "var/lib/redis" / "cert-file"
     assert cert_file.read_text() == "cert"
     # Permission 0600, user and group == "redis"
     assert stat.S_IMODE(cert_file.stat().st_mode) == stat.S_IRUSR | stat.S_IWUSR
     # SCENARIO-NOTE: Scenario doesn't set the user and group (and probably can't
     # since this user and group might not exist locally, only on the container),
     # but also provides no way to check that this was done.
-#    assert cert_file.stat().st_uid == pwd.getpwnam("redis").pw_uid
-#    assert cert_file.stat().st_gid == grp.getgrnam("redis").gr_gid
-    key_file = container_root_fs / 'var/lib/redis' / 'key-file'
+    #    assert cert_file.stat().st_uid == pwd.getpwnam("redis").pw_uid
+    #    assert cert_file.stat().st_gid == grp.getgrnam("redis").gr_gid
+    key_file = container_root_fs / "var/lib/redis" / "key-file"
     assert key_file.read_text() == "key"
     assert stat.S_IMODE(key_file.stat().st_mode) == stat.S_IRUSR | stat.S_IWUSR
-    ca_cert_file = container_root_fs / 'var/lib/redis' / 'ca-cert-file'
+    ca_cert_file = container_root_fs / "var/lib/redis" / "ca-cert-file"
     assert ca_cert_file.read_text() == "ca-cert"
     assert stat.S_IMODE(ca_cert_file.stat().st_mode) == stat.S_IRUSR | stat.S_IWUSR
 
@@ -426,8 +444,7 @@ def test_blocked_on_enable_tls_with_no_certificates(monkeypatch):
     monkeypatch.setattr(RedisK8sCharm, "_redis_client", redis_client)
     ctx = scenario.Context(RedisK8sCharm)
     relation = scenario.PeerRelation(
-       endpoint="redis-peers",
-       local_app_data={"leader-host": "host", "redis-password": "pass"}
+        endpoint="redis-peers", local_app_data={"leader-host": "host", "redis-password": "pass"}
     )
     redis_container = scenario.Container("redis", can_connect=True)
     sentinel_container = scenario.Container("sentinel", can_connect=True)
@@ -436,8 +453,12 @@ def test_blocked_on_enable_tls_with_no_certificates(monkeypatch):
     # then it causes a `RuntimeError` of an inconsistent state, rather than
     # the `NameError` that you get if this happens with Juju/ops.
     monkeypatch.setattr(RedisK8sCharm, "_retrieve_resource", lambda *_: None)
-    state = scenario.State(relations=[relation], containers=[redis_container, sentinel_container], config={"enable-tls": True})
-    out = ctx.run(scenario.Event('config-changed'), state=state)
+    state = scenario.State(
+        relations=[relation],
+        containers=[redis_container, sentinel_container],
+        config={"enable-tls": True},
+    )
+    out = ctx.run(scenario.Event("config-changed"), state=state)
     assert out.unit_status == ops.BlockedStatus("Not enough certificates found")
 
 
@@ -454,27 +475,33 @@ def test_active_on_enable_tls_with_certificates(monkeypatch, resources):
     # (see the note in charm.py).
     unit_pod_hostname = socket.getfqdn()
     relation = scenario.PeerRelation(
-       endpoint="redis-peers",
-       local_app_data={"redis-password": password, "leader-host": unit_pod_hostname}
+        endpoint="redis-peers",
+        local_app_data={"redis-password": password, "leader-host": unit_pod_hostname},
     )
     redis_container = scenario.Container("redis", can_connect=True)
     sentinel_container = scenario.Container("sentinel", can_connect=True)
-    state = scenario.State(leader=True, relations=[relation], containers=[redis_container, sentinel_container], config={"enable-tls": True}, resources=resources)
-    out = ctx.run(scenario.Event('upgrade-charm'), state=state)
-    out = ctx.run(scenario.Event('config-changed'), state=out)
+    state = scenario.State(
+        leader=True,
+        relations=[relation],
+        containers=[redis_container, sentinel_container],
+        config={"enable-tls": True},
+        resources=resources,
+    )
+    out = ctx.run(scenario.Event("upgrade-charm"), state=state)
+    out = ctx.run(scenario.Event("config-changed"), state=out)
 
     assert out.unit_status == ops.ActiveStatus()
     assert out.app_status == ops.ActiveStatus()
     assert out.workload_version == "6.0.11"
     assert out.containers[0].service_status["redis"] == ops.pebble.ServiceStatus.ACTIVE
     container_root_fs = out.containers[0].get_filesystem(ctx)
-    cert_file = container_root_fs / 'var/lib/redis' / 'cert-file'
+    cert_file = container_root_fs / "var/lib/redis" / "cert-file"
     assert cert_file.read_text() == "cert"
     assert stat.S_IMODE(cert_file.stat().st_mode) == stat.S_IRUSR | stat.S_IWUSR
-    key_file = container_root_fs / 'var/lib/redis' / 'key-file'
+    key_file = container_root_fs / "var/lib/redis" / "key-file"
     assert key_file.read_text() == "key"
     assert stat.S_IMODE(key_file.stat().st_mode) == stat.S_IRUSR | stat.S_IWUSR
-    ca_cert_file = container_root_fs / 'var/lib/redis' / 'ca-cert-file'
+    ca_cert_file = container_root_fs / "var/lib/redis" / "ca-cert-file"
     assert ca_cert_file.read_text() == "ca-cert"
     assert stat.S_IMODE(ca_cert_file.stat().st_mode) == stat.S_IRUSR | stat.S_IWUSR
     extra_flags = [
@@ -538,13 +565,18 @@ def test_non_leader_unit_as_replica(monkeypatch, resources):
     # (see the note in charm.py).
     unit_pod_hostname = socket.getfqdn()
     relation = scenario.PeerRelation(
-       endpoint="redis-peers",
-       local_app_data={"redis-password": password, "leader-host": unit_pod_hostname},
-       peers_data={1: {}},
+        endpoint="redis-peers",
+        local_app_data={"redis-password": password, "leader-host": unit_pod_hostname},
+        peers_data={1: {}},
     )
     redis_container = scenario.Container("redis", can_connect=True)
     sentinel_container = scenario.Container("sentinel", can_connect=True)
-    state = scenario.State(leader=True, relations=[relation], containers=[redis_container, sentinel_container], resources=resources)
+    state = scenario.State(
+        leader=True,
+        relations=[relation],
+        containers=[redis_container, sentinel_container],
+        resources=resources,
+    )
     # Trigger peer_relation_joined/changed
     out = ctx.run(relation.joined_event(), state=state)
     # Simulate an update to the application databag made by the leader unit
@@ -597,12 +629,17 @@ def test_application_data_update_after_failover(monkeypatch, resources):
 
     ctx = scenario.Context(RedisK8sCharm)
     relation = scenario.PeerRelation(
-       endpoint="redis-peers",
-       peers_data={1: {}},
+        endpoint="redis-peers",
+        peers_data={1: {}},
     )
     redis_container = scenario.Container("redis", can_connect=True)
     sentinel_container = scenario.Container("sentinel", can_connect=True)
-    state = scenario.State(leader=True, relations=[relation], resources=resources, containers=[redis_container, sentinel_container])
+    state = scenario.State(
+        leader=True,
+        relations=[relation],
+        resources=resources,
+        containers=[redis_container, sentinel_container],
+    )
     # Trigger peer_relation_joined/changed
     out = ctx.run(relation.joined_event(), state=state)
     # Simulate an update to the application databag made by the leader unit
@@ -621,7 +658,7 @@ def test_application_data_update_after_failover(monkeypatch, resources):
     out = out.replace(relations=[relation])
 
     # Now check that a pod reschedule will also result in updated information
-    out = ctx.run(scenario.Event('upgrade-charm'), state=out)
+    out = ctx.run(scenario.Event("upgrade-charm"), state=out)
 
     assert out.relations[0].local_app_data["leader-host"] == "different-leader"
 
@@ -629,15 +666,21 @@ def test_application_data_update_after_failover(monkeypatch, resources):
 def test_forced_failover_when_unit_departed_is_master(monkeypatch, resources):
     ctx = scenario.Context(RedisK8sCharm)
     relation = scenario.PeerRelation(
-       endpoint="redis-peers",
-       local_app_data=APPLICATION_DATA,
+        endpoint="redis-peers",
+        local_app_data=APPLICATION_DATA,
     )
     redis_container = scenario.Container("redis", can_connect=True)
     sentinel_container = scenario.Container("sentinel", can_connect=True)
-    state = scenario.State(leader=True, relations=[relation], containers=[redis_container, sentinel_container], model=scenario.Model('testing-redis-k8s'))
+    state = scenario.State(
+        leader=True,
+        relations=[relation],
+        containers=[redis_container, sentinel_container],
+        model=scenario.Model("testing-redis-k8s"),
+    )
 
     # Custom responses to Redis `execute_command` call
     called_reset = False
+
     def my_side_effect(_, value: str):
         nonlocal called_reset
         if value == "SENTINEL RESET redis-k8s":
